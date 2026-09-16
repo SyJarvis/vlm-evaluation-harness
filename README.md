@@ -161,6 +161,19 @@ vlm-eval --model qwen3.5-vl --tasks all --hub hf ...
 vlm-eval --model qwen3.5-vl --hub hf ...
 ```
 
+### 速率控制
+
+商用 API 通常有账号级限速。被 429 限流时客户端会指数退避重试（8s 起步、上限 60s、尊重 `Retry-After`，至多 6 次）。也可以用 `--rpm` 主动限制每分钟发起的请求数，从源头避免限流：
+
+```bash
+vlm-eval \
+  --tasks babyvision \
+  --model glm-5.3-flash \
+  --rpm 30 \
+  --max-tokens 8192 \
+  --concurrency 4
+```
+
 由于 `all` 包含 CharXiv validation，上述后两种命令需要设置 `OPENAI_JUDGE_API_KEY`。
 
 多任务模式下，`--output-dir` 被视为输出根目录，每个任务写入独立的 `<output-dir>/<task>/<model>/`。`--dataset-path`、`--subset`、`--split` 和 `--revision` 只允许用于单任务运行。

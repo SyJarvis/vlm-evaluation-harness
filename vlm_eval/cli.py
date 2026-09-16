@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--judge-timeout", type=float, default=300)
 
     parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument(
+        "--rpm",
+        type=int,
+        help="cap request starts per minute to stay under provider rate limits",
+    )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--output-dir")
     return parser
@@ -86,6 +91,7 @@ def main(argv: list[str] | None = None) -> None:
         max_retries=args.max_retries,
         image_detail=args.image_detail,
         extra_body=extra_body,
+        rpm=args.rpm,
     )
     try:
         judge_client = _build_judge_client(args, tasks)
