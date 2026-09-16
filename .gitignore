@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# datasets / evaluation artifacts
+lib/
+outputs/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
