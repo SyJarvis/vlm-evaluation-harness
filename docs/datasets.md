@@ -74,7 +74,18 @@ Official prompts, rubrics, mappings and pinned upstream revision are stored in `
 
 ## UnipatAI/BabyVision
 
+- HF repository: `UnipatAI/BabyVision`
+- Default config/split: `default` / `train` (the only split, 388 questions)
+- Two answer types: `choice` (options formatted as letters A–F, gold answer converted from the 1-indexed `choiceAns` field) and `blank` (free-form short answer).
+- Blank answers may be grid coordinates; the evaluator matches coordinates like `(x, y)` tolerantly, including full-width punctuation (`，`、`（）`), and falls back to normalized open-answer matching.
+- Metrics: overall accuracy grouped by `type` (4 coarse abilities), `subtype`, and `ans_type`.
 
+## MMLU
+
+- HF repository: `cais/mmlu`
+- Default config/split: `all` / `test` (14,042 questions across 57 subjects)
+- Four-option multiple choice, text-only (no image): the prompt lists the question and options `(A)`–`(D)` followed by the direct-answer letter instruction.
+- Metrics: overall accuracy and per-subject grouping (`subject`).
 
 ## ChartQA
 

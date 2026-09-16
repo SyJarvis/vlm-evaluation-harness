@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-cd /mnt/data3/runke.zhong/research/projects/vlm-evaluation-harness
+cd vlm-evaluation-harness
 pip install -e .
 
 # 需要 ModelScope 时
@@ -70,7 +70,7 @@ vlm-eval \
   --hub hf \
   --subset vision \
   --prompt-mode cot \
-  --model glm-5.3-flash
+  --model glm-5.3-flash \
   --base-url http://127.0.0.1:18080/v1
 
 vlm-eval \
@@ -79,7 +79,7 @@ vlm-eval \
   --model glm-5.3-flash \
   --max-tokens 4096 \
   --concurrency 8 \
-  --output-dir outputs/babyvision/glm-5.3-flash
+  --output-dir outputs/babyvision/glm-5.3-flash \
   --base-url http://127.0.0.1:18080/v1
 ```
 
@@ -141,7 +141,7 @@ CharXiv 还支持直接指定已下载的官方源码目录：
 vlm-eval \
   --tasks charxiv \
   --hub local \
-  --dataset-path /home/runke.zhong/research/projects/vlm-evaluation-harness/lib/charxiv \
+  --dataset-path /path/to/vlm-evaluation-harness/lib/charxiv \
   --split validation \
   --model qwen3.5-vl \
   --base-url http://127.0.0.1:18080/v1
