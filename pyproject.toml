@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vlm-evaluation-harness"
+version = "0.1.0"
+description = "API-only visual language model evaluation harness"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "datasets>=2.18",
+    "openai>=1.30",
+    "Pillow>=10",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+modelscope = [
+    "modelscope>=1.37",
+    "addict>=2.4",
+]
+test = ["pytest>=8"]
+
+[project.scripts]
+vlm-eval = "vlm_eval.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["vlm_eval*"]
+
+[tool.setuptools.package-data]
+vlm_eval = ["config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
