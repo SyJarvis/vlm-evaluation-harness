@@ -9,6 +9,7 @@ def test_cli_omitted_tasks_defaults_to_all():
     assert _parse_tasks(args.tasks) == [
         "chartqa",
         "docvqa",
+        "mmlu",
         "mmmu",
         "mmmu_pro",
         "mmstar",
@@ -24,6 +25,7 @@ def test_cli_all_selects_all_tasks():
     assert _parse_tasks(args.tasks) == [
         "chartqa",
         "docvqa",
+        "mmlu",
         "mmmu",
         "mmmu_pro",
         "mmstar",

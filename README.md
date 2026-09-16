@@ -8,6 +8,7 @@
 - CharXiv：descriptive + reasoning，使用官方 GPT-4o judge 协议
 - ChartQA：支持 Relaxed Accuracy（5% 数值容差）及 human / augmented 细分统计
 - DocVQA：支持 ANLS（Average Normalized Levenshtein Similarity）评测
+- MMLU (`cais/mmlu`)：语言理解与多学科通识基准
 
 工具只调用 API，不在评测进程中加载模型。数据可来自 Hugging Face、ModelScope 或本地路径。
 
