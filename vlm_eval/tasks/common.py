@@ -125,6 +125,98 @@ def eval_open_answer(answer: Any, predictions: list[str | float]) -> bool:
     return False
 
 
+def calculate_relaxed_accuracy(prediction: Any, gold: Any, tolerance: float = 0.05) -> bool:
+    """Calculate relaxed accuracy for ChartQA.
+    
+    If gold is a float or number, check if relative error <= tolerance (default 5%).
+    Otherwise check exact match (case/space-insensitive).
+    """
+    if prediction is None or gold is None:
+        return False
+    
+    if isinstance(gold, list):
+        return any(calculate_relaxed_accuracy(prediction, g, tolerance=tolerance) for g in gold)
+
+    pred_str = str(prediction).strip().lower()
+    gold_str = str(gold).strip().lower()
+
+    if pred_str == gold_str:
+        return True
+
+    def _clean_number(val: str) -> float | None:
+        val = val.replace("%", "").replace(",", "").replace("$", "").strip()
+        try:
+            return float(val)
+        except ValueError:
+            return None
+
+    pred_num = _clean_number(pred_str)
+    gold_num = _clean_number(gold_str)
+
+    if pred_num is not None and gold_num is not None:
+        if gold_num == 0:
+            return pred_num == 0
+        relative_error = abs(pred_num - gold_num) / abs(gold_num)
+        return relative_error <= tolerance
+
+    # Clean punctuation and check equality
+    pred_clean = re.sub(r"[^\w\s]", "", pred_str)
+    gold_clean = re.sub(r"[^\w\s]", "", gold_str)
+    return pred_clean == gold_clean and bool(pred_clean)
+
+
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    """Compute standard Levenshtein distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def calculate_anls(prediction: Any, gold_answers: list[Any] | Any, tau: float = 0.5) -> float:
+    """Calculate Average Normalized Levenshtein Similarity (ANLS) for DocVQA.
+    
+    ANLS = 1 - (dist / max(len(pred), len(gold))) if (dist / max(len(pred), len(gold))) < tau else 0.
+    """
+    if prediction is None:
+        return 0.0
+    if not isinstance(gold_answers, list):
+        gold_answers = [gold_answers]
+    if not gold_answers:
+        return 0.0
+
+    pred_str = str(prediction).strip().lower()
+    best_score = 0.0
+
+    for gold in gold_answers:
+        gold_str = str(gold).strip().lower()
+        if not pred_str and not gold_str:
+            score = 1.0
+        elif not pred_str or not gold_str:
+            score = 0.0
+        else:
+            dist = _levenshtein_distance(pred_str, gold_str)
+            norm_dist = dist / max(len(pred_str), len(gold_str))
+            score = 1.0 - norm_dist if norm_dist < tau else 0.0
+        if score > best_score:
+            best_score = score
+            if best_score == 1.0:
+                break
+
+    return best_score
+
+
 def grouped_accuracy(
     records: list[dict[str, Any]], key: str
 ) -> dict[str, dict[str, int | float]]:

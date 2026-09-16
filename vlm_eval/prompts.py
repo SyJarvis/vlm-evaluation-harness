@@ -35,3 +35,11 @@ MMMU_PRO_COT_VISION = (
 MMSTAR_ANSWER_HINT = (
     "Answer with the option's letter from the given choices directly."
 )
+
+CHARTQA_DIRECT_PROMPT = (
+    "Answer the question directly using a single word, number, or phrase without extra explanation."
+)
+
+DOCVQA_DIRECT_PROMPT = (
+    "Answer the question directly using a single word or short phrase extracted from the document."
+)

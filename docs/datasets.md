@@ -76,4 +76,16 @@ Official prompts, rubrics, mappings and pinned upstream revision are stored in `
 
 
 
-## ChartQA/DocVQA
+## ChartQA
+
+- HF repository: `HuggingFaceM4/ChartQA`
+- Default split: `test`
+- Evaluation metric: **Relaxed Accuracy** (relative error $\le 5\%$ for numbers, exact string match for text).
+- Reports overall accuracy, relaxed accuracy, and splits by type (`human`, `augmented`).
+
+## DocVQA
+
+- HF repository: `lmms-lab/DocVQA`
+- Default config / split: `DocVQA` / `validation`
+- Evaluation metric: **ANLS** (Average Normalized Levenshtein Similarity, threshold $\tau = 0.5$).
+- Reports average ANLS and binary accuracy (ANLS $\ge 0.5$).

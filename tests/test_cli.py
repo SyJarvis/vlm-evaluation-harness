@@ -7,6 +7,8 @@ def test_cli_omitted_tasks_defaults_to_all():
     args = build_parser().parse_args(["--model", "qwen3.5-vl"])
 
     assert _parse_tasks(args.tasks) == [
+        "chartqa",
+        "docvqa",
         "mmmu",
         "mmmu_pro",
         "mmstar",
@@ -20,6 +22,8 @@ def test_cli_all_selects_all_tasks():
     )
 
     assert _parse_tasks(args.tasks) == [
+        "chartqa",
+        "docvqa",
         "mmmu",
         "mmmu_pro",
         "mmstar",

@@ -1,11 +1,15 @@
 from .base import DatasetAdapter, DatasetConfig
+from .chartqa import ChartQAAdapter
 from .charxiv import CharXivAdapter
+from .docvqa import DocVQAAdapter
 from .mmmu import MMMUAdapter
 from .mmmu_pro import MMMUProAdapter
 from .mmstar import MMStarAdapter
 
 
 ADAPTERS: dict[str, DatasetAdapter] = {
+    "chartqa": ChartQAAdapter(),
+    "docvqa": DocVQAAdapter(),
     "mmmu": MMMUAdapter(),
     "mmmu_pro": MMMUProAdapter(),
     "mmstar": MMStarAdapter(),
