@@ -8,6 +8,7 @@
 - CharXiv：descriptive + reasoning，使用官方 GPT-4o judge 协议
 - ChartQA：支持 Relaxed Accuracy（5% 数值容差）及 human / augmented 细分统计
 - DocVQA：支持 ANLS（Average Normalized Levenshtein Similarity）评测
+- BabyVision (`UnipatAI/BabyVision`)：涵盖细粒度辨别、空间感知、视觉追踪、视觉模式识别（支持坐标提取与选择题评测）
 - MMLU (`cais/mmlu`)：语言理解与多学科通识基准
 
 工具只调用 API，不在评测进程中加载模型。数据可来自 Hugging Face、ModelScope 或本地路径。
@@ -71,6 +72,16 @@ vlm-eval \
   --prompt-mode cot \
   --model glm-5.3-flash
   --base-url http://127.0.0.1:18080/v1
+
+vlm-eval \
+  --tasks babyvision \
+  --hub hf \
+  --model glm-5.3-flash \
+  --max-tokens 4096 \
+  --concurrency 8 \
+  --output-dir outputs/babyvision/glm-5.3-flash
+  --base-url http://127.0.0.1:18080/v1
+```
 
 CharXiv validation 需要一把独立的 judge key。被测模型和 judge 可以使用不同的 OpenAI-compatible 服务：
 
