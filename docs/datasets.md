@@ -66,7 +66,7 @@ Scoring is a second API stage using the official judge protocol:
 - Invalid judge outputs receive score `-1` and count as zero during aggregation.
 - A complete validation run uses 807 descriptive judge calls and 1,000 reasoning judge calls.
 
-The evaluated model key is loaded from `--api-key` or `OPENAI_API_KEY`. The independent judge key is loaded from `--judge-api-key` or `OPENAI_JUDGE_API_KEY`; keys are never written to run artifacts.
+The evaluated model key is read from the environment variable named by `model.api_key_env` (default `OPENAI_API_KEY`). The independent judge key is read from the variable named by `judge.api_key_env` (default `OPENAI_JUDGE_API_KEY`); keys are never written to run artifacts.
 
 The public test split has an upstream limitation: Number-in-General prompts normally derive the required decimal precision from the hidden reference answer. Since that answer is unavailable, the evaluator omits this precision suffix and records `precision_instruction_omitted` in sample metadata.
 
