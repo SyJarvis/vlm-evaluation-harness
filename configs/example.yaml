@@ -1,0 +1,36 @@
+run:
+  name: qwen3.5-vl-suite
+  output_root: runs
+
+model:
+  name: qwen3.5-vl
+  base_url: http://127.0.0.1:18080/v1
+  api_key_env: OPENAI_API_KEY
+  max_tokens: 128
+  temperature: 0
+  image_detail: auto
+
+judge:
+  model: gpt-4o-2024-05-13
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_JUDGE_API_KEY
+
+runtime:
+  concurrency: 8
+
+tasks:
+  - name: mmstar
+  - id: mmmu_pro_vision_cot
+    name: mmmu_pro
+    subset: vision
+    prompt_mode: cot
+    generation:
+      max_tokens: 2048
+  - name: charxiv
+    split: validation
+  - name: babyvision
+    generation:
+      max_tokens: 4096
+    runtime:
+      concurrency: 4
+      rpm: 30

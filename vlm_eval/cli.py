@@ -2,196 +2,148 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
-from pathlib import Path
+import sys
+from typing import Any
 
 from .api import OpenAIChatClient, OpenAIJudgeClient
 from .evaluator import run_evaluation
+from .run_config import (
+    ConfigError,
+    judge_api_key,
+    load_config,
+    model_api_key,
+    needs_judge,
+)
+from .run_store import RunStore
 from .task_config import load_task_config
-from .tasks import ADAPTERS, DatasetConfig, get_adapter
+from .tasks import DatasetConfig, get_adapter
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="vlm-eval",
         description="Evaluate VLMs through an OpenAI-compatible Chat API",
         allow_abbrev=False,
     )
-    parser.add_argument(
-        "--tasks",
-        help="comma-separated tasks; use 'all' or omit this option to run all tasks",
-    )
-    parser.add_argument(
-        "--hub",
-        choices=["hf", "modelscope", "local"],
-        default="hf",
-    )
-    parser.add_argument("--dataset-path")
-    parser.add_argument("--subset")
-    parser.add_argument("--split")
-    parser.add_argument("--revision", help="HF revision or ModelScope version")
-    parser.add_argument("--cache-dir")
-    parser.add_argument("--prompt-mode", choices=["direct", "cot"], default="direct")
+    commands = parser.add_subparsers(dest="command", required=True)
 
-    parser.add_argument("--model", required=True)
-    parser.add_argument(
-        "--base-url",
-        default=os.environ.get("OPENAI_BASE_URL", "http://127.0.0.1:8000/v1"),
-    )
-    parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY", "local"))
-    parser.add_argument("--max-tokens", type=int, default=128)
-    parser.add_argument("--temperature", type=float, default=0)
-    parser.add_argument("--timeout", type=float, default=300)
-    parser.add_argument("--max-retries", type=int, default=5)
-    parser.add_argument("--image-detail", choices=["auto", "low", "high"], default="auto")
-    parser.add_argument("--extra-body", help="JSON object forwarded to the API request")
+    run = commands.add_parser("run", help="start a new run from a YAML config")
+    run.add_argument("config", help="path to the run config YAML")
+    run.add_argument("--limit", type=int, help="evaluate only the first N samples per task")
 
-    parser.add_argument(
-        "--judge-model",
-        default=os.environ.get("OPENAI_JUDGE_MODEL"),
-        help="LLM judge model; CharXiv defaults to its official GPT-4o snapshot",
-    )
-    parser.add_argument(
-        "--judge-base-url",
-        default=os.environ.get("OPENAI_JUDGE_BASE_URL", "https://api.openai.com/v1"),
-    )
-    parser.add_argument(
-        "--judge-api-key",
-        default=os.environ.get("OPENAI_JUDGE_API_KEY"),
-    )
-    parser.add_argument("--judge-timeout", type=float, default=300)
-
-    parser.add_argument("--concurrency", type=int, default=8)
-    parser.add_argument(
-        "--rpm",
-        type=int,
-        help="cap request starts per minute to stay under provider rate limits",
-    )
-    parser.add_argument("--limit", type=int)
-    parser.add_argument("--output-dir")
+    resume = commands.add_parser("resume", help="continue an existing run directory")
+    resume.add_argument("run_dir", help="runs/<run_id> directory to resume")
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0].startswith("-") and argv[0] not in ("-h", "--help"):
+        parser.error(
+            "command-line evaluation options were removed; "
+            "describe the run in YAML and use 'vlm-eval run <config.yaml>'"
+        )
     args = parser.parse_args(argv)
+
     try:
-        tasks = _parse_tasks(args.tasks)
-        _validate_multi_task_args(args, tasks)
-    except ValueError as exc:
+        if args.command == "run":
+            resolved = load_config(args.config, limit=args.limit)
+            api_key, judge_key = model_api_key(resolved), judge_api_key(resolved)
+            store = RunStore.create(resolved)
+        else:
+            store, resolved = RunStore.open(args.run_dir)
+            api_key, judge_key = model_api_key(resolved), judge_api_key(resolved)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
-    extra_body = _parse_extra_body(args.extra_body)
-    client = OpenAIChatClient(
-        model=args.model,
-        base_url=args.base_url,
-        api_key=args.api_key,
-        max_tokens=args.max_tokens,
-        temperature=args.temperature,
-        timeout=args.timeout,
-        max_retries=args.max_retries,
-        image_detail=args.image_detail,
-        extra_body=extra_body,
-        rpm=args.rpm,
+
+    print(f"run directory: {store.root}")
+    summary = execute_run(store, resolved, api_key=api_key, judge_key=judge_key)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+def execute_run(
+    store: RunStore,
+    resolved: dict[str, Any],
+    *,
+    api_key: str,
+    judge_key: str | None,
+) -> dict[str, Any]:
+    judge_client = (
+        _build_judge_client(resolved["judge"], judge_key)
+        if judge_key is not None
+        else None
     )
-    try:
-        judge_client = _build_judge_client(args, tasks)
-    except ValueError as exc:
-        parser.error(str(exc))
-    summaries = {}
-    for task in tasks:
-        adapter = get_adapter(task)
+    for task in resolved["tasks"]:
+        task_id = task["id"]
+        if store.task_is_done(task_id):
+            continue
+        adapter = get_adapter(task["name"])
+        client = _build_chat_client(resolved["model"], task, api_key)
+        task_judge = judge_client if needs_judge(task) else None
         dataset_config = DatasetConfig(
-            source=args.hub,
-            dataset_path=args.dataset_path or adapter.default_path(args.hub),
-            subset=args.subset or adapter.default_subset,
-            split=args.split or adapter.default_split,
-            cache_dir=args.cache_dir,
-            prompt_mode=args.prompt_mode,
-            revision=args.revision,
+            source=task["hub"],
+            dataset_path=task["dataset_path"],
+            subset=task["subset"],
+            split=task["split"],
+            prompt_mode=task["prompt_mode"],
+            revision=task["revision"],
         )
-        summaries[task] = run_evaluation(
-            adapter=adapter,
-            dataset_config=dataset_config,
-            client=client,
-            judge_client=judge_client if task == "charxiv" else None,
-            output_dir=_output_dir(args.output_dir, task, args.model, len(tasks)),
-            concurrency=args.concurrency,
-            limit=args.limit,
-        )
+        context: dict[str, Any] = {"api": client.public_config()}
+        if adapter.protocol_config():
+            context["task_protocol"] = adapter.protocol_config()
+        if task_judge is not None:
+            context["judge_api"] = task_judge.public_config()
 
-    result = summaries[tasks[0]] if len(tasks) == 1 else summaries
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+        store.start_task(task_id, context)
+        try:
+            run_evaluation(
+                adapter=adapter,
+                dataset_config=dataset_config,
+                client=client,
+                judge_client=task_judge,
+                output_dir=store.task_dir(task_id),
+                concurrency=task["runtime"]["concurrency"],
+                limit=task["runtime"]["limit"],
+                task_id=task_id,
+                on_stage=lambda stage, task_id=task_id: store.set_task_status(task_id, stage),
+            )
+        except BaseException as exc:
+            store.set_task_status(task_id, "failed", error=f"{type(exc).__name__}: {exc}")
+            raise
+        store.set_task_status(task_id, "completed")
+    return store.write_summary()
 
 
-def _parse_extra_body(value: str | None) -> dict:
-    if value is None:
-        return {}
-    parsed = json.loads(value)
-    if not isinstance(parsed, dict):
-        raise ValueError("--extra-body must be a JSON object")
-    return parsed
-
-
-def _build_judge_client(args, tasks):
-    if "charxiv" not in tasks:
-        return None
-    split = args.split or get_adapter("charxiv").default_split
-    if split == "test":
-        return None
-    if not args.judge_api_key:
-        raise ValueError(
-            "CharXiv validation requires --judge-api-key or OPENAI_JUDGE_API_KEY"
-        )
-    judge = load_task_config("charxiv")["judge"]
-    return OpenAIJudgeClient(
-        model=args.judge_model or judge["model"],
-        base_url=args.judge_base_url,
-        api_key=args.judge_api_key,
-        temperature=judge["temperature"],
-        top_p=judge["top_p"],
-        seed=judge["seed"],
-        response_format=judge["response_format"],
-        timeout=args.judge_timeout,
+def _build_chat_client(model: dict, task: dict, api_key: str) -> OpenAIChatClient:
+    generation = task["generation"]
+    return OpenAIChatClient(
+        model=model["name"],
+        base_url=model["base_url"],
+        api_key=api_key,
+        max_tokens=generation["max_tokens"],
+        temperature=generation["temperature"],
+        timeout=model["timeout"],
+        max_retries=model["max_retries"],
+        image_detail=generation["image_detail"],
+        extra_body=generation["extra_body"],
+        rpm=task["runtime"]["rpm"],
     )
 
 
-def _parse_tasks(value: str | None) -> list[str]:
-    if value is None or value.strip().lower() == "all":
-        return list(ADAPTERS)
-    tasks = [item.strip().lower() for item in value.split(",") if item.strip()]
-    if not tasks:
-        raise ValueError("--tasks cannot be empty")
-    if "all" in tasks:
-        raise ValueError("'all' cannot be combined with explicit task names")
-    unknown = [task for task in tasks if task not in ADAPTERS]
-    if unknown:
-        raise ValueError(f"unsupported tasks: {', '.join(unknown)}")
-    return list(dict.fromkeys(tasks))
-
-
-def _validate_multi_task_args(args: argparse.Namespace, tasks: list[str]) -> None:
-    if len(tasks) == 1:
-        return
-    if args.hub != "hf":
-        raise ValueError("multiple tasks currently require --hub hf")
-    task_specific = [args.dataset_path, args.subset, args.split, args.revision]
-    if any(value is not None for value in task_specific):
-        raise ValueError(
-            "--dataset-path, --subset, --split and --revision require exactly one task"
-        )
-
-
-def _output_dir(
-    configured: str | None, task: str, model: str, task_count: int
-) -> Path:
-    if configured is not None:
-        root = Path(configured)
-        return root if task_count == 1 else root / task / _safe_name(model)
-    return Path("outputs") / task / _safe_name(model)
-
-
-def _safe_name(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_") or "model"
+def _build_judge_client(judge: dict, api_key: str) -> OpenAIJudgeClient:
+    protocol = load_task_config("charxiv")["judge"]
+    return OpenAIJudgeClient(
+        model=judge["model"],
+        base_url=judge["base_url"],
+        api_key=api_key,
+        temperature=protocol["temperature"],
+        top_p=protocol["top_p"],
+        seed=protocol["seed"],
+        response_format=protocol["response_format"],
+        timeout=judge["timeout"],
+    )
 
 
 if __name__ == "__main__":

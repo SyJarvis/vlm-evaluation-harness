@@ -12,6 +12,7 @@ dependencies = [
     "datasets>=2.18",
     "openai>=1.30",
     "Pillow>=10",
+    "PyYAML>=6",
     "tqdm>=4.66",
 ]
 
