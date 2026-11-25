@@ -107,7 +107,7 @@ class CharXivAdapter(DatasetAdapter):
         if any(record.get("answer") is None for record in records):
             raise ValueError("CharXiv records cannot mix public test and validation data")
         if judge_client is None:
-            raise ValueError("CharXiv validation scoring requires --judge-api-key")
+            raise ValueError("CharXiv validation scoring requires a judge client")
         if output_dir is None:
             raise ValueError("CharXiv scoring requires an output directory")
 

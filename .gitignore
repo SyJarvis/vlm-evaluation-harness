@@ -4,6 +4,7 @@
 # datasets / evaluation artifacts
 lib/
 outputs/
+runs/
 
 # build artifacts
 build/
